@@ -5,7 +5,9 @@ WORKDIR /app
 COPY package*.json ./
 
 RUN npm cache clean --force
-RUN npm install --legacy-peer-deps
+RUN npm install
+
+RUN apt-get update && apt-get install -y postgresql-client
 
 COPY . .
 
