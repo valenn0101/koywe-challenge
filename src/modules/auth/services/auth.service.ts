@@ -10,6 +10,7 @@ import {
   InvalidTokenException,
   UnauthorizedException,
 } from '../exceptions/auth-exceptions';
+import { UserAlreadyExistsException } from '../../users/exceptions/user-exceptions';
 
 @Injectable()
 export class AuthService {
@@ -42,6 +43,9 @@ export class AuthService {
       const user = await this.usersService.create(createUserDto);
       return this.generateTokens(user.id, user.email);
     } catch (error) {
+      if (error instanceof UserAlreadyExistsException) {
+        throw error;
+      }
       throw new AuthenticationFailedException('Error al registrar el usuario');
     }
   }
