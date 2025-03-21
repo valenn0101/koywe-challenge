@@ -1,5 +1,12 @@
 import { applyDecorators } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBody,
+  ApiBearerAuth,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UserResponseSchema } from './user.schema';
 
@@ -93,6 +100,7 @@ export const ApiCreateUser = () => {
 
 export const ApiFindAllUsers = () => {
   return applyDecorators(
+    ApiBearerAuth(),
     ApiOperation({ summary: 'Obtener todos los usuarios' }),
     ApiResponse({
       status: 200,
@@ -112,13 +120,17 @@ export const ApiFindAllUsers = () => {
             email: 'maria.gonzalez@empresa.com',
             createdAt: '2024-03-21T16:30:00Z',
           },
-          {
-            id: 3,
-            name: 'Carlos Rodríguez',
-            email: 'carlos.rodriguez@ejemplo.com',
-            createdAt: '2024-03-21T17:45:00Z',
-          },
         ],
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'No autorizado - Token no proporcionado o inválido',
+      schema: {
+        example: {
+          statusCode: 401,
+          message: 'No se proporcionó token de acceso',
+          error: 'Unauthorized',
+        },
       },
     }),
   );
@@ -126,6 +138,7 @@ export const ApiFindAllUsers = () => {
 
 export const ApiFindUserById = () => {
   return applyDecorators(
+    ApiBearerAuth(),
     ApiOperation({
       summary: 'Obtener un usuario por ID',
       description:
@@ -151,6 +164,16 @@ export const ApiFindUserById = () => {
       description: 'Usuario encontrado',
       type: UserResponseSchema,
     }),
+    ApiUnauthorizedResponse({
+      description: 'No autorizado - Token no proporcionado o inválido',
+      schema: {
+        example: {
+          statusCode: 401,
+          message: 'No se proporcionó token de acceso',
+          error: 'Unauthorized',
+        },
+      },
+    }),
     ApiResponse({
       status: 404,
       description: 'Usuario no encontrado',
@@ -167,6 +190,7 @@ export const ApiFindUserById = () => {
 
 export const ApiFindUserByEmail = () => {
   return applyDecorators(
+    ApiBearerAuth(),
     ApiOperation({
       summary: 'Obtener un usuario por email',
       description:
@@ -195,6 +219,16 @@ export const ApiFindUserByEmail = () => {
       status: 200,
       description: 'Usuario encontrado',
       type: UserResponseSchema,
+    }),
+    ApiUnauthorizedResponse({
+      description: 'No autorizado - Token no proporcionado o inválido',
+      schema: {
+        example: {
+          statusCode: 401,
+          message: 'No se proporcionó token de acceso',
+          error: 'Unauthorized',
+        },
+      },
     }),
     ApiResponse({
       status: 404,
