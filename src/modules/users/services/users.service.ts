@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CreateUserDto } from '../dto/create-user.dto';
+import { FindUserDto } from '../dto/find-user.dto';
 import { UserEntity } from '../entities/user.entity';
 import { UsersRepository } from '../repositories/users.repository';
 import * as bcrypt from 'bcrypt';
@@ -8,6 +9,7 @@ import {
   PasswordHashFailedException,
   IncompleteFormDataException,
   PasswordValidationException,
+  UserNotFoundException,
 } from '../exceptions/user-exceptions';
 
 @Injectable()
@@ -80,5 +82,25 @@ export class UsersService {
     if (password.length < minLength || !hasSpecialChar) {
       throw new PasswordValidationException();
     }
+  }
+
+  async findOne(findUserDto: FindUserDto): Promise<UserEntity> {
+    let user: UserEntity | null = null;
+
+    if (findUserDto.id) {
+      user = await this.usersRepository.findById(findUserDto.id);
+    } else if (findUserDto.email) {
+      user = await this.usersRepository.findByEmail(findUserDto.email);
+    }
+
+    if (!user) {
+      throw new UserNotFoundException(findUserDto.id || findUserDto.email);
+    }
+
+    return user;
+  }
+
+  async findAll(): Promise<UserEntity[]> {
+    return this.usersRepository.findAll();
   }
 }

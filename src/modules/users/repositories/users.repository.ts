@@ -26,4 +26,17 @@ export class UsersRepository {
 
     return user ? new UserEntity(user) : null;
   }
+
+  async findById(id: string): Promise<UserEntity | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    return user ? new UserEntity(user) : null;
+  }
+
+  async findAll(): Promise<UserEntity[]> {
+    const users = await this.prisma.user.findMany();
+    return users.map((user) => new UserEntity(user));
+  }
 }
