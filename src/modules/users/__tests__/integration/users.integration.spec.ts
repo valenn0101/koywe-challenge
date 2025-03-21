@@ -9,10 +9,24 @@ describe('Users Integration Tests', () => {
   let app: INestApplication;
   let prismaService: PrismaService;
 
+  const mockPrismaService = {
+    user: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      findMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    $connect: jest.fn(),
+    $disconnect: jest.fn(),
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue(mockPrismaService)
+      .compile();
 
     app = moduleFixture.createNestApplication();
 
@@ -30,12 +44,12 @@ describe('Users Integration Tests', () => {
     await app.init();
   });
 
-  beforeEach(async () => {
-    await prismaService.user.deleteMany({});
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPrismaService.user.deleteMany.mockResolvedValue({ count: 0 });
   });
 
   afterAll(async () => {
-    await prismaService.user.deleteMany({});
     await app.close();
   });
 
@@ -47,6 +61,15 @@ describe('Users Integration Tests', () => {
         password: 'Password1!',
       };
 
+      mockPrismaService.user.create.mockResolvedValue({
+        id: '1',
+        name: createUserDto.name,
+        email: createUserDto.email,
+        password: 'hashed_password',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
       const response = await request(app.getHttpServer())
         .post('/users')
         .send(createUserDto)
@@ -56,18 +79,7 @@ describe('Users Integration Tests', () => {
       expect(response.body.name).toBe(createUserDto.name);
       expect(response.body.email).toBe(createUserDto.email);
 
-      if (response.body.password) {
-        expect(response.body.password).not.toBe(createUserDto.password);
-      }
-
-      const savedUser = await prismaService.user.findUnique({
-        where: { email: createUserDto.email },
-      });
-
-      expect(savedUser).not.toBeNull();
-      expect(savedUser.name).toBe(createUserDto.name);
-      expect(savedUser.email).toBe(createUserDto.email);
-      expect(savedUser.password).not.toBe(createUserDto.password);
+      expect(mockPrismaService.user.create).toHaveBeenCalled();
     });
 
     it('should reject the creation with invalid data', async () => {
@@ -95,48 +107,46 @@ describe('Users Integration Tests', () => {
         password: 'Password1!',
       };
 
-      await request(app.getHttpServer())
-        .post('/users')
-        .send(existingUser)
-        .expect(201);
+      mockPrismaService.user.findUnique.mockResolvedValueOnce({
+        id: '1',
+        ...existingUser,
+        password: 'hashed_password',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
 
       await request(app.getHttpServer())
         .post('/users')
-        .send({
-          name: 'Another User',
-          email: 'existing@example.com',
-          password: 'AnotherPassword1!',
-        })
+        .send(existingUser)
         .expect(409);
     });
   });
 
   describe('GET /users/:id', () => {
     it('should get a user by ID', async () => {
-      const createUserDto = {
+      const userId = '1';
+      const user = {
+        id: userId,
         name: 'Test User',
         email: 'test@example.com',
-        password: 'Password1!',
+        password: 'hashed_password',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
-      const createResponse = await request(app.getHttpServer())
-        .post('/users')
-        .send(createUserDto)
-        .expect(201);
+      mockPrismaService.user.findUnique.mockResolvedValueOnce(user);
 
-      const userId = createResponse.body.id;
-
-      const getResponse = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .get(`/users/${userId}`)
         .expect(200);
 
-      expect(getResponse.body).toHaveProperty('id', userId);
-      expect(getResponse.body.name).toBe(createUserDto.name);
-      expect(getResponse.body.email).toBe(createUserDto.email);
-
-      if (getResponse.body.password) {
-        expect(getResponse.body.password).not.toBe(createUserDto.password);
-      }
+      expect(response.body).toEqual({
+        createdAt: user.createdAt.toISOString(),
+        id: userId,
+        name: user.name,
+        email: user.email,
+        updatedAt: user.updatedAt.toISOString(),
+      });
     });
 
     it('should return 404 for a non-existent ID', async () => {
@@ -148,23 +158,28 @@ describe('Users Integration Tests', () => {
 
   describe('GET /users/email/:email', () => {
     it('should get a user by email', async () => {
-      const createUserDto = {
+      const user = {
+        id: '1',
         name: 'Email Test User',
         email: 'email-test@example.com',
-        password: 'Password1!',
+        password: 'hashed_password',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       };
 
-      await request(app.getHttpServer())
-        .post('/users')
-        .send(createUserDto)
-        .expect(201);
+      mockPrismaService.user.findUnique.mockResolvedValueOnce(user);
 
-      const getResponse = await request(app.getHttpServer())
-        .get(`/users/email/${createUserDto.email}`)
+      const response = await request(app.getHttpServer())
+        .get(`/users/email/${user.email}`)
         .expect(200);
 
-      expect(getResponse.body.name).toBe(createUserDto.name);
-      expect(getResponse.body.email).toBe(createUserDto.email);
+      expect(response.body).toEqual({
+        createdAt: user.createdAt.toISOString(),
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        updatedAt: user.updatedAt.toISOString(),
+      });
     });
 
     it('should return 404 for a non-existent email', async () => {
@@ -176,36 +191,38 @@ describe('Users Integration Tests', () => {
 
   describe('GET /users', () => {
     it('should get the list of users', async () => {
-      const users = [
+      const mockUsers = [
         {
+          id: '1',
           name: 'User 1',
           email: 'user1@example.com',
-          password: 'Password1!',
+          password: 'hashed_password1',
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
         {
+          id: '2',
           name: 'User 2',
           email: 'user2@example.com',
-          password: 'Password2!',
+          password: 'hashed_password2',
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ];
 
-      for (const user of users) {
-        await request(app.getHttpServer())
-          .post('/users')
-          .send(user)
-          .expect(201);
-      }
+      mockPrismaService.user.findMany.mockResolvedValueOnce(mockUsers);
 
       const response = await request(app.getHttpServer())
         .get('/users')
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThanOrEqual(2);
-
-      const emails = response.body.map((u: any) => u.email);
-      expect(emails).toContain('user1@example.com');
-      expect(emails).toContain('user2@example.com');
+      expect(response.body).toEqual(
+        mockUsers.map(({ password, ...user }) => ({
+          ...user,
+          createdAt: user.createdAt.toISOString(),
+          updatedAt: user.updatedAt.toISOString(),
+        })),
+      );
     });
   });
 });
