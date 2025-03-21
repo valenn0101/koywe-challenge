@@ -52,7 +52,7 @@ describe('UsersService', () => {
       };
 
       const expectedUser = new UserEntity({
-        id: '1',
+        id: 1,
         name: 'Test User',
         email: 'test@example.com',
         password: 'hashed_password',
@@ -85,7 +85,7 @@ describe('UsersService', () => {
       };
 
       const existingUser = new UserEntity({
-        id: '1',
+        id: 1,
         name: 'Existing User',
         email: 'existing@example.com',
         password: 'hashed_password',
@@ -120,7 +120,7 @@ describe('UsersService', () => {
 
   describe('findOne', () => {
     it('should find a user by ID', async () => {
-      const userId = '1';
+      const userId = 1;
       const expectedUser = new UserEntity({
         id: userId,
         name: 'Test User',
@@ -141,7 +141,7 @@ describe('UsersService', () => {
     it('should find a user by email', async () => {
       const userEmail = 'test@example.com';
       const expectedUser = new UserEntity({
-        id: '1',
+        id: 1,
         name: 'Test User',
         email: userEmail,
         password: 'hashed_password',
@@ -158,7 +158,7 @@ describe('UsersService', () => {
     });
 
     it('should throw UserNotFoundException when the user is not found', async () => {
-      const userId = 'nonexistent';
+      const userId = 99;
 
       mockUsersRepository.findById.mockResolvedValue(null);
 
@@ -173,7 +173,7 @@ describe('UsersService', () => {
     it('should return an array of users', async () => {
       const expectedUsers = [
         new UserEntity({
-          id: '1',
+          id: 1,
           name: 'User 1',
           email: 'user1@example.com',
           password: 'hashed_password',
@@ -181,7 +181,7 @@ describe('UsersService', () => {
           updatedAt: new Date(),
         }),
         new UserEntity({
-          id: '2',
+          id: 2,
           name: 'User 2',
           email: 'user2@example.com',
           password: 'hashed_password',
