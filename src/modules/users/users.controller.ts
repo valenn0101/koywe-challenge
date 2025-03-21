@@ -8,21 +8,31 @@ export class UsersController {
 
   @Post()
   async create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+    const user = await this.usersService.create(createUserDto);
+    const { password, ...result } = user;
+    return result;
   }
 
   @Get()
   async findAll() {
-    return this.usersService.findAll();
+    const users = await this.usersService.findAll();
+    return users.map((user) => {
+      const { password, ...result } = user;
+      return result;
+    });
   }
 
   @Get(':id')
   async findById(@Param('id') id: string) {
-    return this.usersService.findOne({ id });
+    const user = await this.usersService.findOne({ id });
+    const { password, ...result } = user;
+    return result;
   }
 
   @Get('email/:email')
   async findByEmail(@Param('email') email: string) {
-    return this.usersService.findOne({ email });
+    const user = await this.usersService.findOne({ email });
+    const { password, ...result } = user;
+    return result;
   }
 }
