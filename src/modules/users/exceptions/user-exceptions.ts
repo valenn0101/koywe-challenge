@@ -7,7 +7,7 @@ export class UserAlreadyExistsException extends HttpException {
 }
 
 export class UserNotFoundException extends HttpException {
-  constructor(identifier: string) {
+  constructor(identifier: number | string) {
     super(
       {
         message: 'Usuario no encontrado',

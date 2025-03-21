@@ -24,7 +24,7 @@ export class UsersController {
 
   @Get(':id')
   async findById(@Param('id') id: string) {
-    const user = await this.usersService.findOne({ id });
+    const user = await this.usersService.findOne({ id: parseInt(id) });
     const { password, ...result } = user;
     return result;
   }

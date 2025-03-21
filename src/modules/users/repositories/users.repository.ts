@@ -27,7 +27,7 @@ export class UsersRepository {
     return user ? new UserEntity(user) : null;
   }
 
-  async findById(id: string): Promise<UserEntity | null> {
+  async findById(id: number): Promise<UserEntity | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },
     });
