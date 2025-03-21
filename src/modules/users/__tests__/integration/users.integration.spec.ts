@@ -4,10 +4,13 @@ import * as request from 'supertest';
 import { AppModule } from '../../../../app.module';
 import { PrismaService } from '../../../../database/prisma.service';
 import { HttpExceptionFilter } from '../../../../common/filters/http-exception.filter';
+import { JwtService } from '@nestjs/jwt';
 
 describe('Users Integration Tests', () => {
   let app: INestApplication;
   let prismaService: PrismaService;
+  let jwtService: JwtService;
+  let validToken: string;
 
   const mockPrismaService = {
     user: {
@@ -29,6 +32,7 @@ describe('Users Integration Tests', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    jwtService = app.get<JwtService>(JwtService);
 
     app.useGlobalPipes(
       new ValidationPipe({
@@ -40,6 +44,9 @@ describe('Users Integration Tests', () => {
     app.useGlobalFilters(new HttpExceptionFilter());
 
     prismaService = app.get<PrismaService>(PrismaService);
+
+    // Generar un token válido para las pruebas
+    validToken = jwtService.sign({ sub: 1, email: 'test@example.com' });
 
     await app.init();
   });
@@ -69,6 +76,7 @@ describe('Users Integration Tests', () => {
 
       const response = await request(app.getHttpServer())
         .get(`/users/${userId}`)
+        .set('Authorization', `Bearer ${validToken}`)
         .expect(200);
 
       expect(response.body).toEqual({
@@ -80,9 +88,14 @@ describe('Users Integration Tests', () => {
       });
     });
 
+    it('should return 401 when no token is provided', async () => {
+      await request(app.getHttpServer()).get('/users/1').expect(401);
+    });
+
     it('should return 404 for a non-existent ID', async () => {
       await request(app.getHttpServer())
         .get('/users/nonexistent-id')
+        .set('Authorization', `Bearer ${validToken}`)
         .expect(404);
     });
   });
@@ -102,6 +115,7 @@ describe('Users Integration Tests', () => {
 
       const response = await request(app.getHttpServer())
         .get(`/users/email/${user.email}`)
+        .set('Authorization', `Bearer ${validToken}`)
         .expect(200);
 
       expect(response.body).toEqual({
@@ -113,9 +127,16 @@ describe('Users Integration Tests', () => {
       });
     });
 
+    it('should return 401 when no token is provided', async () => {
+      await request(app.getHttpServer())
+        .get('/users/email/test@example.com')
+        .expect(401);
+    });
+
     it('should return 404 for a non-existent email', async () => {
       await request(app.getHttpServer())
         .get('/users/email/nonexistent@example.com')
+        .set('Authorization', `Bearer ${validToken}`)
         .expect(404);
     });
   });
@@ -145,6 +166,7 @@ describe('Users Integration Tests', () => {
 
       const response = await request(app.getHttpServer())
         .get('/users')
+        .set('Authorization', `Bearer ${validToken}`)
         .expect(200);
 
       expect(response.body).toEqual(
@@ -154,6 +176,10 @@ describe('Users Integration Tests', () => {
           updatedAt: user.updatedAt.toISOString(),
         })),
       );
+    });
+
+    it('should return 401 when no token is provided', async () => {
+      await request(app.getHttpServer()).get('/users').expect(401);
     });
   });
 });

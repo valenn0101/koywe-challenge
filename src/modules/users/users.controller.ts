@@ -1,13 +1,16 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { UsersService } from './services/users.service';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import {
   ApiFindAllUsers,
   ApiFindUserById,
   ApiFindUserByEmail,
 } from './swagger/user.decorator';
+import { AuthGuard } from '../auth/guards/auth.guard';
 
 @ApiTags('Usuarios')
+@ApiBearerAuth()
+@UseGuards(AuthGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
