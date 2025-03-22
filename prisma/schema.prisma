@@ -20,4 +20,20 @@ model User {
   password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  quotes    Quote[]
+}
+
+model Quote {
+  id              Int   @id @default(autoincrement())
+  from            String
+  to              String
+  amount          Float
+  rate            Float
+  convertedAmount Float
+  timestamp       DateTime @default(now())
+  expiresAt       DateTime
+  userId          Int
+  user            User     @relation(fields: [userId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
