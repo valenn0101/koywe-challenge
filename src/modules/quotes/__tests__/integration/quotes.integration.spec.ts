@@ -216,4 +216,186 @@ describe('Quotes Integration Tests', () => {
       expect(mockPrismaService.quote.create).not.toHaveBeenCalled();
     });
   });
+
+  describe('GET /quote/:id', () => {
+    const quoteId = 1;
+    const userId = 1;
+
+    const mockQuote = {
+      id: quoteId,
+      from: Currency.ARS,
+      to: Currency.ETH,
+      amount: 1000000,
+      rate: 0.0000023,
+      convertedAmount: 2.3,
+      timestamp: new Date(),
+      expiresAt: new Date(new Date().getTime() + 5 * 60000),
+      userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should return a quote when it exists and is not expired', async () => {
+      mockPrismaService.quote.findUnique.mockResolvedValue(mockQuote);
+
+      const response = await request(app.getHttpServer())
+        .get(`/quote/${quoteId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(response.body).toBeDefined();
+      expect(response.body.id).toEqual(mockQuote.id);
+      expect(response.body.from).toEqual(mockQuote.from);
+      expect(response.body.to).toEqual(mockQuote.to);
+      expect(response.body.amount).toEqual(mockQuote.amount);
+      expect(response.body.rate).toEqual(mockQuote.rate);
+      expect(response.body.convertedAmount).toEqual(mockQuote.convertedAmount);
+      expect(mockPrismaService.quote.findUnique).toHaveBeenCalledWith({
+        where: { id: quoteId },
+      });
+    });
+
+    it('should return 404 when quote does not exist', async () => {
+      mockPrismaService.quote.findUnique.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .get(`/quote/${quoteId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(404);
+
+      expect(mockPrismaService.quote.findUnique).toHaveBeenCalledWith({
+        where: { id: quoteId },
+      });
+    });
+
+    it('should return 404 when quote is expired', async () => {
+      const expiredQuote = {
+        ...mockQuote,
+        expiresAt: new Date(new Date().getTime() - 60000),
+      };
+
+      mockPrismaService.quote.findUnique.mockResolvedValue(expiredQuote);
+
+      await request(app.getHttpServer())
+        .get(`/quote/${quoteId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(404);
+
+      expect(mockPrismaService.quote.findUnique).toHaveBeenCalledWith({
+        where: { id: quoteId },
+      });
+    });
+
+    it('should return 403 when not authenticated', async () => {
+      await request(app.getHttpServer()).get(`/quote/${quoteId}`).expect(403);
+
+      expect(mockPrismaService.quote.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('should return 400 when quoteId is not a number', async () => {
+      await request(app.getHttpServer())
+        .get('/quote/not-a-number')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(400);
+
+      expect(mockPrismaService.quote.findUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /quote/currencies/all', () => {
+    it('should return all available currencies', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/quote/currencies/all')
+        .expect(200);
+
+      expect(response.body).toBeDefined();
+      expect(Array.isArray(response.body)).toBeTruthy();
+      expect(response.body).toEqual(Object.values(Currency));
+      expect(response.body.length).toEqual(Object.values(Currency).length);
+    });
+
+    it('should not require authentication', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/quote/currencies/all')
+        .expect(200);
+
+      expect(response.body).toBeDefined();
+      expect(Array.isArray(response.body)).toBeTruthy();
+    });
+  });
+
+  describe('GET /quote/user/all', () => {
+    const userId = 1;
+
+    const mockQuotes = [
+      {
+        id: 1,
+        from: Currency.ARS,
+        to: Currency.ETH,
+        amount: 1000000,
+        rate: 0.0000023,
+        convertedAmount: 2.3,
+        timestamp: new Date(),
+        expiresAt: new Date(new Date().getTime() + 5 * 60000),
+        userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 2,
+        from: Currency.ETH,
+        to: Currency.BTC,
+        amount: 1,
+        rate: 0.05,
+        convertedAmount: 0.05,
+        timestamp: new Date(),
+        expiresAt: new Date(new Date().getTime() + 5 * 60000),
+        userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    it('should return all quotes for the authenticated user', async () => {
+      mockPrismaService.quote.findMany.mockResolvedValue(mockQuotes);
+
+      const response = await request(app.getHttpServer())
+        .get('/quote/user/all')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(response.body).toBeDefined();
+      expect(Array.isArray(response.body)).toBeTruthy();
+      expect(response.body.length).toEqual(mockQuotes.length);
+      expect(response.body[0].id).toEqual(mockQuotes[0].id);
+      expect(response.body[1].id).toEqual(mockQuotes[1].id);
+
+      expect(mockPrismaService.quote.findMany).toHaveBeenCalledWith({
+        where: { userId },
+      });
+    });
+
+    it('should return empty array when user has no quotes', async () => {
+      mockPrismaService.quote.findMany.mockResolvedValue([]);
+
+      const response = await request(app.getHttpServer())
+        .get('/quote/user/all')
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(response.body).toBeDefined();
+      expect(Array.isArray(response.body)).toBeTruthy();
+      expect(response.body.length).toEqual(0);
+
+      expect(mockPrismaService.quote.findMany).toHaveBeenCalledWith({
+        where: { userId },
+      });
+    });
+
+    it('should return 403 when not authenticated', async () => {
+      await request(app.getHttpServer()).get('/quote/user/all').expect(403);
+
+      expect(mockPrismaService.quote.findMany).not.toHaveBeenCalled();
+    });
+  });
 });

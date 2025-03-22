@@ -7,6 +7,7 @@ import {
   ApiUnauthorizedResponse,
   ApiBadRequestResponse,
   ApiInternalServerErrorResponse,
+  ApiParam,
 } from '@nestjs/swagger';
 import { CreateQuoteDto } from '../dto/create-quote.dto';
 import { QuoteResponseSchema } from './quote.schema';
@@ -136,6 +137,137 @@ export const ApiCreateQuote = () => {
           error: 'Internal Server Error',
         },
       },
+    }),
+  );
+};
+
+export const ApiGetQuoteById = () => {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary: 'Obtener una cotización por ID',
+      description:
+        'Recupera una cotización existente por su ID, validando que no haya expirado',
+    }),
+    ApiParam({
+      name: 'id',
+      type: 'number',
+      description: 'ID de la cotización a recuperar',
+      required: true,
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Cotización recuperada exitosamente',
+      type: QuoteResponseSchema,
+      schema: {
+        example: {
+          id: 1,
+          from: 'ARS',
+          to: 'ETH',
+          amount: 1000000,
+          rate: 0.0000023,
+          convertedAmount: 2.3,
+          timestamp: '2025-02-03T12:00:00Z',
+          expiresAt: '2025-02-03T12:05:00Z',
+        },
+      },
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Cotización no encontrada o expirada',
+      schema: {
+        example: {
+          statusCode: 404,
+          message: 'La cotización con ID 1 no encontrada',
+          error: 'Not Found',
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'No autorizado - Token no proporcionado o inválido',
+    }),
+  );
+};
+
+export const ApiGetAllCurrencies = () => {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary: 'Obtener todas las monedas disponibles',
+      description:
+        'Devuelve la lista de todas las monedas soportadas por el sistema',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Lista de monedas disponibles',
+      schema: {
+        example: [
+          'ARS',
+          'ETH',
+          'BTC',
+          'USDT',
+          'XEM',
+          'CLP',
+          'SHIB',
+          'DOGE',
+          'XLM',
+        ],
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'No autorizado - Token no proporcionado o inválido',
+    }),
+  );
+};
+
+export const ApiGetUserQuotes = () => {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary: 'Obtener todas las cotizaciones del usuario',
+      description:
+        'Recupera todas las cotizaciones asociadas al usuario autenticado',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Lista de cotizaciones del usuario',
+      schema: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'number', example: 1 },
+            from: { type: 'string', example: 'ARS' },
+            to: { type: 'string', example: 'ETH' },
+            amount: { type: 'number', example: 1000000 },
+            rate: { type: 'number', example: 0.0000023 },
+            convertedAmount: { type: 'number', example: 2.3 },
+            timestamp: {
+              type: 'string',
+              format: 'date-time',
+              example: '2025-02-03T12:00:00Z',
+            },
+            expiresAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2025-02-03T12:05:00Z',
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2025-02-03T12:00:00Z',
+            },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              example: '2025-02-03T12:00:00Z',
+            },
+          },
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'No autorizado - Token no proporcionado o inválido',
     }),
   );
 };

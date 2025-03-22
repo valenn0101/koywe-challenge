@@ -13,6 +13,7 @@ import {
   IExchangeRateApi,
   EXCHANGE_RATE_API,
 } from '../../../infrastructure/api/exchange-rate-api.interface';
+import { NotFoundException } from '@nestjs/common';
 
 describe('QuotesService', () => {
   let service: QuotesService;
@@ -151,6 +152,127 @@ describe('QuotesService', () => {
         createQuoteDto.to,
       );
       expect(repository.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('getQuoteById', () => {
+    const quoteId = 1;
+    const userId = 1;
+    const mockQuote = new QuoteEntity({
+      id: quoteId,
+      from: Currency.ARS,
+      to: Currency.ETH,
+      amount: 1000000,
+      rate: 0.0000023,
+      convertedAmount: 2.3,
+      timestamp: new Date(),
+      expiresAt: new Date(new Date().getTime() + 5 * 60000),
+      userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    it('should return a quote when it exists and is not expired', async () => {
+      mockRepository.findById.mockResolvedValue(mockQuote);
+
+      const result = await service.getQuoteById(quoteId);
+
+      expect(result).toBeDefined();
+      expect(result.id).toEqual(mockQuote.id);
+      expect(result.from).toEqual(mockQuote.from);
+      expect(result.to).toEqual(mockQuote.to);
+      expect(result.amount).toEqual(mockQuote.amount);
+      expect(result.rate).toEqual(mockQuote.rate);
+      expect(result.convertedAmount).toEqual(mockQuote.convertedAmount);
+      expect(mockRepository.findById).toHaveBeenCalledWith(quoteId);
+    });
+
+    it('should throw NotFoundException when quote does not exist', async () => {
+      mockRepository.findById.mockResolvedValue(null);
+
+      await expect(service.getQuoteById(quoteId)).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(mockRepository.findById).toHaveBeenCalledWith(quoteId);
+    });
+
+    it('should throw NotFoundException when quote is expired', async () => {
+      const expiredQuote = new QuoteEntity({
+        ...mockQuote,
+        expiresAt: new Date(new Date().getTime() - 60000),
+      });
+
+      mockRepository.findById.mockResolvedValue(expiredQuote);
+
+      await expect(service.getQuoteById(quoteId)).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(mockRepository.findById).toHaveBeenCalledWith(quoteId);
+    });
+  });
+
+  describe('getAllCurrencies', () => {
+    it('should return all currency values', async () => {
+      const result = await service.getAllCurrencies();
+
+      expect(result).toEqual(Object.values(Currency));
+      expect(Array.isArray(result)).toBeTruthy();
+      expect(result.length).toEqual(Object.values(Currency).length);
+    });
+  });
+
+  describe('getUserQuotes', () => {
+    const userId = 1;
+    const mockQuotes = [
+      new QuoteEntity({
+        id: 1,
+        from: Currency.ARS,
+        to: Currency.ETH,
+        amount: 1000000,
+        rate: 0.0000023,
+        convertedAmount: 2.3,
+        timestamp: new Date(),
+        expiresAt: new Date(new Date().getTime() + 5 * 60000),
+        userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+      new QuoteEntity({
+        id: 2,
+        from: Currency.ETH,
+        to: Currency.BTC,
+        amount: 1,
+        rate: 0.05,
+        convertedAmount: 0.05,
+        timestamp: new Date(),
+        expiresAt: new Date(new Date().getTime() + 5 * 60000),
+        userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    ];
+
+    it('should return quotes for the specified user', async () => {
+      mockRepository.findByUserId.mockResolvedValue(mockQuotes);
+
+      const result = await service.getUserQuotes(userId);
+
+      expect(result).toEqual(mockQuotes);
+      expect(result.length).toEqual(mockQuotes.length);
+      expect(mockRepository.findByUserId).toHaveBeenCalledWith(userId);
+    });
+
+    it('should return empty array when user has no quotes', async () => {
+      mockRepository.findByUserId.mockResolvedValue([]);
+
+      const result = await service.getUserQuotes(userId);
+
+      expect(result).toEqual([]);
+      expect(Array.isArray(result)).toBeTruthy();
+      expect(result.length).toEqual(0);
+      expect(mockRepository.findByUserId).toHaveBeenCalledWith(userId);
     });
   });
 });
