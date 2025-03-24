@@ -24,11 +24,13 @@ describe('Auth Integration Tests', () => {
   });
 
   afterAll(async () => {
+    await prismaService.quote.deleteMany();
     await prismaService.user.deleteMany();
     await app.close();
   });
 
   beforeEach(async () => {
+    await prismaService.quote.deleteMany();
     await prismaService.user.deleteMany();
   });
 

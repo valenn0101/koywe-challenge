@@ -1,5 +1,5 @@
 import { Controller, Get, Param, UseGuards } from '@nestjs/common';
-import { UsersService } from './services/users.service';
+import { UsersFacade } from './services/users.facade';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import {
   ApiFindAllUsers,
@@ -13,12 +13,12 @@ import { AuthGuard } from '../auth/guards/auth.guard';
 @UseGuards(AuthGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersFacade: UsersFacade) {}
 
   @Get()
   @ApiFindAllUsers()
   async findAll() {
-    const users = await this.usersService.findAll();
+    const users = await this.usersFacade.findAll();
     return users.map((user) => {
       const { password, ...result } = user;
       return result;
@@ -28,7 +28,7 @@ export class UsersController {
   @Get(':id')
   @ApiFindUserById()
   async findById(@Param('id') id: string) {
-    const user = await this.usersService.findOne({ id: parseInt(id) });
+    const user = await this.usersFacade.findOne({ id: parseInt(id) });
     const { password, ...result } = user;
     return result;
   }
@@ -36,7 +36,7 @@ export class UsersController {
   @Get('email/:email')
   @ApiFindUserByEmail()
   async findByEmail(@Param('email') email: string) {
-    const user = await this.usersService.findOne({ email });
+    const user = await this.usersFacade.findOne({ email });
     const { password, ...result } = user;
     return result;
   }

@@ -1,5 +1,5 @@
 import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
-import { AuthService } from '../services/auth.service';
+import { AuthFacade } from '../services/auth.facade';
 import { Tokens } from '../interfaces/tokens.interface';
 import { CreateUserDto } from '../../users/dto/create-user.dto';
 import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
@@ -10,7 +10,7 @@ import { LoginSwagger, RegisterSwagger, RefreshSwagger } from '../swagger';
 @ApiTags('Autenticación')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authFacade: AuthFacade) {}
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
@@ -19,7 +19,7 @@ export class AuthController {
   @ApiResponse(RegisterSwagger.responses[HttpStatus.BAD_REQUEST])
   @ApiResponse(RegisterSwagger.responses[HttpStatus.CONFLICT])
   async register(@Body() createUserDto: CreateUserDto): Promise<Tokens> {
-    return this.authService.register(createUserDto);
+    return this.authFacade.register(createUserDto);
   }
 
   @Post('login')
@@ -28,7 +28,7 @@ export class AuthController {
   @ApiResponse(LoginSwagger.responses[HttpStatus.OK])
   @ApiResponse(LoginSwagger.responses[HttpStatus.UNAUTHORIZED])
   async login(@Body() loginDto: LoginDto): Promise<Tokens> {
-    return this.authService.login(loginDto.email, loginDto.password);
+    return this.authFacade.login(loginDto.email, loginDto.password);
   }
 
   @Post('refresh')
@@ -39,6 +39,6 @@ export class AuthController {
   async refreshTokens(
     @Body() refreshTokenDto: RefreshTokenDto,
   ): Promise<Tokens> {
-    return this.authService.refreshTokens(refreshTokenDto.refreshToken);
+    return this.authFacade.refreshTokens(refreshTokenDto.refreshToken);
   }
 }
