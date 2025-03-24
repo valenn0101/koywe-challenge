@@ -19,6 +19,7 @@ import {
   ApiGetQuoteById,
   ApiGetAllCurrencies,
   ApiGetUserQuotes,
+  ApiDeleteQuote,
 } from '../swagger';
 
 @ApiTags('Cotizaciones')
@@ -79,6 +80,7 @@ export class QuotesController {
   }
 
   @Delete(':id')
+  @ApiDeleteQuote()
   @UseGuards(AuthGuard)
   async deleteQuote(@Param('id', ParseIntPipe) id: number) {
     return this.quotesFacade.deleteQuote(id);
