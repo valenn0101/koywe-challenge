@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from '../../../services/auth.service';
-import { UsersService } from '../../../../users/services/users.service';
+import { UsersFacade } from '../../../../users/services/users.facade';
 import { CreateUserDto } from '../../../../users/dto/create-user.dto';
 import { UserEntity } from '../../../../users/entities/user.entity';
 import { UserAlreadyExistsException } from '../../../../users/exceptions/user-exceptions';
@@ -19,11 +19,11 @@ jest.mock('bcrypt', () => ({
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: UsersService;
+  let usersFacade: UsersFacade;
   let jwtService: JwtService;
   let configService: ConfigService;
 
-  const mockUsersService = {
+  const mockUsersFacade = {
     create: jest.fn(),
     findOne: jest.fn(),
     updateRefreshToken: jest.fn(),
@@ -43,8 +43,8 @@ describe('AuthService', () => {
       providers: [
         AuthService,
         {
-          provide: UsersService,
-          useValue: mockUsersService,
+          provide: UsersFacade,
+          useValue: mockUsersFacade,
         },
         {
           provide: JwtService,
@@ -58,7 +58,7 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    usersService = module.get<UsersService>(UsersService);
+    usersFacade = module.get<UsersFacade>(UsersFacade);
     jwtService = module.get<JwtService>(JwtService);
     configService = module.get<ConfigService>(ConfigService);
 
@@ -92,17 +92,17 @@ describe('AuthService', () => {
         },
       };
 
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersFacade.findOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockJwtService.signAsync
         .mockResolvedValueOnce(mockTokens.accessToken)
         .mockResolvedValueOnce(mockTokens.refreshToken);
-      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
+      mockUsersFacade.updateRefreshToken.mockResolvedValue(undefined);
 
       const result = await service.login(loginData.email, loginData.password);
 
       expect(result).toEqual(mockTokens);
-      expect(usersService.findOne).toHaveBeenCalledWith({
+      expect(usersFacade.findOne).toHaveBeenCalledWith({
         email: loginData.email,
       });
       expect(bcrypt.compare).toHaveBeenCalledWith(
@@ -112,20 +112,20 @@ describe('AuthService', () => {
     });
 
     it('should throw AuthenticationFailedException when the password is incorrect', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersFacade.findOne.mockResolvedValue(mockUser);
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(
         service.login(loginData.email, 'wrongpassword'),
       ).rejects.toThrow(AuthenticationFailedException);
 
-      expect(usersService.findOne).toHaveBeenCalledWith({
+      expect(usersFacade.findOne).toHaveBeenCalledWith({
         email: loginData.email,
       });
     });
 
     it('should throw AuthenticationFailedException when the user does not exist', async () => {
-      mockUsersService.findOne.mockRejectedValue(new Error());
+      mockUsersFacade.findOne.mockRejectedValue(new Error());
 
       await expect(
         service.login(loginData.email, loginData.password),
@@ -158,35 +158,35 @@ describe('AuthService', () => {
         },
       };
 
-      mockUsersService.create.mockResolvedValue(mockUser);
+      mockUsersFacade.create.mockResolvedValue(mockUser);
       mockJwtService.signAsync
         .mockResolvedValueOnce(mockTokens.accessToken)
         .mockResolvedValueOnce(mockTokens.refreshToken);
-      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
+      mockUsersFacade.updateRefreshToken.mockResolvedValue(undefined);
 
       const result = await service.register(createUserDto);
 
       expect(result).toEqual(mockTokens);
-      expect(usersService.create).toHaveBeenCalledWith(createUserDto);
+      expect(usersFacade.create).toHaveBeenCalledWith(createUserDto);
     });
 
     it('should throw UserAlreadyExistsException when the user already exists', async () => {
       const error = new UserAlreadyExistsException(createUserDto.email);
-      mockUsersService.create.mockRejectedValue(error);
+      mockUsersFacade.create.mockRejectedValue(error);
 
       await expect(service.register(createUserDto)).rejects.toThrow(
         UserAlreadyExistsException,
       );
-      expect(usersService.create).toHaveBeenCalledWith(createUserDto);
+      expect(usersFacade.create).toHaveBeenCalledWith(createUserDto);
     });
 
     it('should throw AuthenticationFailedException in case of general error', async () => {
-      mockUsersService.create.mockRejectedValue(new Error());
+      mockUsersFacade.create.mockRejectedValue(new Error());
 
       await expect(service.register(createUserDto)).rejects.toThrow(
         AuthenticationFailedException,
       );
-      expect(usersService.create).toHaveBeenCalledWith(createUserDto);
+      expect(usersFacade.create).toHaveBeenCalledWith(createUserDto);
     });
   });
 
@@ -219,11 +219,11 @@ describe('AuthService', () => {
       };
 
       mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
-      mockUsersService.findOne.mockResolvedValue(mockUser);
+      mockUsersFacade.findOne.mockResolvedValue(mockUser);
       mockJwtService.signAsync
         .mockResolvedValueOnce(mockTokens.accessToken)
         .mockResolvedValueOnce(mockTokens.refreshToken);
-      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
+      mockUsersFacade.updateRefreshToken.mockResolvedValue(undefined);
 
       const result = await service.refreshTokens(refreshToken);
 
@@ -231,14 +231,14 @@ describe('AuthService', () => {
       expect(mockJwtService.verifyAsync).toHaveBeenCalledWith(refreshToken, {
         secret: 'test-secret-key',
       });
-      expect(usersService.findOne).toHaveBeenCalledWith({
+      expect(usersFacade.findOne).toHaveBeenCalledWith({
         id: mockUser.id,
       });
     });
 
     it('should throw InvalidTokenException when the email does not match', async () => {
       mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
-      mockUsersService.findOne.mockResolvedValue({
+      mockUsersFacade.findOne.mockResolvedValue({
         ...mockUser,
         email: 'different@example.com',
       });
@@ -250,7 +250,7 @@ describe('AuthService', () => {
 
     it('should throw InvalidTokenException when the refresh token does not match', async () => {
       mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
-      mockUsersService.findOne.mockResolvedValue({
+      mockUsersFacade.findOne.mockResolvedValue({
         ...mockUser,
         refreshToken: 'different_token',
       });
@@ -262,7 +262,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException when the user does not exist', async () => {
       mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
-      mockUsersService.findOne.mockRejectedValue(new Error());
+      mockUsersFacade.findOne.mockRejectedValue(new Error());
 
       await expect(service.refreshTokens(refreshToken)).rejects.toThrow(
         UnauthorizedException,
