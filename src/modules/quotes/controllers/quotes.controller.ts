@@ -8,6 +8,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Delete,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { QuotesFacade } from '../services/quotes.facade';
@@ -75,5 +76,11 @@ export class QuotesController {
     }
 
     return this.quotesFacade.getUserQuotes(userId);
+  }
+
+  @Delete(':id')
+  @UseGuards(AuthGuard)
+  async deleteQuote(@Param('id', ParseIntPipe) id: number) {
+    return this.quotesFacade.deleteQuote(id);
   }
 }

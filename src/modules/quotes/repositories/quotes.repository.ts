@@ -51,7 +51,7 @@ export class QuotesRepository {
 
   async findByUserId(userId: number): Promise<QuoteEntity[]> {
     const quotes = await this.prisma.quote.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
     });
 
     return quotes.map(
@@ -62,5 +62,18 @@ export class QuotesRepository {
           to: quote.to as Currency,
         }),
     );
+  }
+
+  async softDelete(id: number): Promise<QuoteEntity> {
+    const quote = await this.prisma.quote.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    return new QuoteEntity({
+      ...quote,
+      from: quote.from as Currency,
+      to: quote.to as Currency,
+    });
   }
 }
