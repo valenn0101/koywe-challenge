@@ -13,6 +13,8 @@ import {
 import {
   UserAlreadyExistsException,
   UserNotFoundException,
+  PasswordValidationException,
+  IncompleteFormDataException,
 } from '../../users/exceptions/user-exceptions';
 import { UserEntity } from '../../users/entities/user.entity';
 
@@ -54,7 +56,11 @@ export class AuthService {
       const user = await this.usersService.create(createUserDto);
       return this.generateTokens(user);
     } catch (error) {
-      if (error instanceof UserAlreadyExistsException) {
+      if (
+        error instanceof UserAlreadyExistsException ||
+        error instanceof PasswordValidationException ||
+        error instanceof IncompleteFormDataException
+      ) {
         throw error;
       }
 
