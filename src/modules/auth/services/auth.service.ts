@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from '../../users/services/users.service';
+import { UsersFacade } from '../../users/services/users.facade';
 import * as bcrypt from 'bcrypt';
 import { Tokens, JwtPayload } from '../interfaces/tokens.interface';
 import { CreateUserDto } from '../../users/dto/create-user.dto';
@@ -21,14 +21,14 @@ import { UserEntity } from '../../users/entities/user.entity';
 @Injectable()
 export class AuthService {
   constructor(
-    private usersService: UsersService,
+    private usersFacade: UsersFacade,
     private jwtService: JwtService,
     private configService: ConfigService,
   ) {}
 
   async login(email: string, password: string): Promise<Tokens> {
     try {
-      const user = await this.usersService.findOne({ email });
+      const user = await this.usersFacade.findOne({ email });
 
       const passwordMatch = await bcrypt.compare(password, user.password);
       if (!passwordMatch) {
@@ -53,7 +53,7 @@ export class AuthService {
 
   async register(createUserDto: CreateUserDto): Promise<Tokens> {
     try {
-      const user = await this.usersService.create(createUserDto);
+      const user = await this.usersFacade.create(createUserDto);
       return this.generateTokens(user);
     } catch (error) {
       if (
@@ -74,7 +74,7 @@ export class AuthService {
       const userId = payload.sub;
       const email = payload.email;
 
-      const user = await this.usersService.findOne({ id: userId });
+      const user = await this.usersFacade.findOne({ id: userId });
 
       if (user.email !== email) {
         throw new InvalidTokenException();
@@ -125,7 +125,7 @@ export class AuthService {
         }),
       ]);
 
-      await this.usersService.updateRefreshToken(user.id, refreshToken);
+      await this.usersFacade.updateRefreshToken(user.id, refreshToken);
 
       return {
         accessToken,
