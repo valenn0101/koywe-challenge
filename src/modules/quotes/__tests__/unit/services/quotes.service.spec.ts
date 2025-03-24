@@ -24,6 +24,7 @@ describe('QuotesService', () => {
     create: jest.fn(),
     findById: jest.fn(),
     findByUserId: jest.fn(),
+    softDelete: jest.fn(),
   };
 
   const mockExchangeRateApi = {
@@ -273,6 +274,52 @@ describe('QuotesService', () => {
       expect(Array.isArray(result)).toBeTruthy();
       expect(result.length).toEqual(0);
       expect(mockRepository.findByUserId).toHaveBeenCalledWith(userId);
+    });
+  });
+
+  describe('deleteQuote', () => {
+    const quoteId = 1;
+    const userId = 1;
+    const mockQuote = new QuoteEntity({
+      id: quoteId,
+      from: Currency.ARS,
+      to: Currency.ETH,
+      amount: 1000000,
+      rate: 0.0000023,
+      convertedAmount: 2.3,
+      timestamp: new Date(),
+      expiresAt: new Date(new Date().getTime() + 5 * 60000),
+      userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should soft delete a quote when it exists', async () => {
+      mockRepository.findById.mockResolvedValue(mockQuote);
+      mockRepository.softDelete.mockResolvedValue({
+        ...mockQuote,
+        deletedAt: new Date(),
+      });
+
+      await service.deleteQuote(quoteId);
+
+      expect(mockRepository.findById).toHaveBeenCalledWith(quoteId);
+      expect(mockRepository.softDelete).toHaveBeenCalledWith(quoteId);
+    });
+
+    it('should throw NotFoundException when quote does not exist', async () => {
+      mockRepository.findById.mockResolvedValue(null);
+
+      await expect(service.deleteQuote(quoteId)).rejects.toThrow(
+        NotFoundException,
+      );
+
+      expect(mockRepository.findById).toHaveBeenCalledWith(quoteId);
+      expect(mockRepository.softDelete).not.toHaveBeenCalled();
     });
   });
 });
