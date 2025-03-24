@@ -90,4 +90,14 @@ export class QuotesService {
   async getUserQuotes(userId: number): Promise<QuoteEntity[]> {
     return this.quotesRepository.findByUserId(userId);
   }
+
+  async deleteQuote(id: number): Promise<void> {
+    const quote = await this.quotesRepository.findById(id);
+
+    if (!quote) {
+      throw new NotFoundException(`Cotización con ID ${id} no encontrada`);
+    }
+
+    await this.quotesRepository.softDelete(id);
+  }
 }

@@ -15,6 +15,7 @@ describe('QuotesFacade', () => {
     getQuoteById: jest.fn(),
     getAllCurrencies: jest.fn(),
     getUserQuotes: jest.fn(),
+    deleteQuote: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -172,6 +173,31 @@ describe('QuotesFacade', () => {
       await expect(facade.getUserQuotes(userId)).rejects.toThrow(error);
 
       expect(mockQuotesService.getUserQuotes).toHaveBeenCalledWith(userId);
+    });
+  });
+
+  describe('deleteQuote', () => {
+    const quoteId = 1;
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should delegate to QuotesService.deleteQuote', async () => {
+      mockQuotesService.deleteQuote.mockResolvedValue(undefined);
+
+      await facade.deleteQuote(quoteId);
+
+      expect(mockQuotesService.deleteQuote).toHaveBeenCalledWith(quoteId);
+    });
+
+    it('should throw any errors from QuotesService', async () => {
+      const error = new Error('Quote not found');
+      mockQuotesService.deleteQuote.mockRejectedValue(error);
+
+      await expect(facade.deleteQuote(quoteId)).rejects.toThrow(error);
+
+      expect(mockQuotesService.deleteQuote).toHaveBeenCalledWith(quoteId);
     });
   });
 });

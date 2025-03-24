@@ -38,6 +38,7 @@ describe('Quotes Integration Tests', () => {
       findUnique: jest.fn(),
       findMany: jest.fn(),
       deleteMany: jest.fn(),
+      update: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -302,6 +303,71 @@ describe('Quotes Integration Tests', () => {
     });
   });
 
+  describe('DELETE /quote/:id', () => {
+    const quoteId = 1;
+    const userId = 1;
+
+    const mockQuote = {
+      id: quoteId,
+      from: Currency.ARS,
+      to: Currency.ETH,
+      amount: 1000000,
+      rate: 0.0000023,
+      convertedAmount: 2.3,
+      timestamp: new Date(),
+      expiresAt: new Date(new Date().getTime() + 5 * 60000),
+      userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should soft delete a quote when it exists', async () => {
+      mockPrismaService.quote.findUnique.mockResolvedValue(mockQuote);
+      mockPrismaService.quote.update.mockResolvedValue({
+        ...mockQuote,
+        deletedAt: new Date(),
+      });
+
+      await request(app.getHttpServer())
+        .delete(`/quote/${quoteId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(200);
+
+      expect(mockPrismaService.quote.findUnique).toHaveBeenCalledWith({
+        where: { id: quoteId },
+      });
+      expect(mockPrismaService.quote.update).toHaveBeenCalledWith({
+        where: { id: quoteId },
+        data: expect.objectContaining({
+          deletedAt: expect.any(Date),
+        }),
+      });
+    });
+
+    it('should return 404 when quote does not exist', async () => {
+      mockPrismaService.quote.findUnique.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .delete(`/quote/${quoteId}`)
+        .set('Authorization', `Bearer ${accessToken}`)
+        .expect(404);
+
+      expect(mockPrismaService.quote.findUnique).toHaveBeenCalledWith({
+        where: { id: quoteId },
+      });
+      expect(mockPrismaService.quote.update).not.toHaveBeenCalled();
+    });
+
+    it('should return 403 when not authenticated', async () => {
+      await request(app.getHttpServer())
+        .delete(`/quote/${quoteId}`)
+        .expect(403);
+
+      expect(mockPrismaService.quote.findUnique).not.toHaveBeenCalled();
+      expect(mockPrismaService.quote.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('GET /quote/currencies/all', () => {
     it('should return all available currencies', async () => {
       const response = await request(app.getHttpServer())
@@ -371,7 +437,10 @@ describe('Quotes Integration Tests', () => {
       expect(response.body[1].id).toEqual(mockQuotes[1].id);
 
       expect(mockPrismaService.quote.findMany).toHaveBeenCalledWith({
-        where: { userId },
+        where: {
+          userId,
+          deletedAt: null,
+        },
       });
     });
 
@@ -388,7 +457,10 @@ describe('Quotes Integration Tests', () => {
       expect(response.body.length).toEqual(0);
 
       expect(mockPrismaService.quote.findMany).toHaveBeenCalledWith({
-        where: { userId },
+        where: {
+          userId,
+          deletedAt: null,
+        },
       });
     });
 

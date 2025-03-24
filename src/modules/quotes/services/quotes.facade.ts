@@ -27,4 +27,8 @@ export class QuotesFacade {
   async getUserQuotes(userId: number): Promise<QuoteEntity[]> {
     return this.quotesService.getUserQuotes(userId);
   }
+
+  async deleteQuote(id: number): Promise<void> {
+    return this.quotesService.deleteQuote(id);
+  }
 }

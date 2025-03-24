@@ -252,17 +252,41 @@ export const ApiGetUserQuotes = () => {
               format: 'date-time',
               example: '2025-02-03T12:05:00Z',
             },
-            createdAt: {
-              type: 'string',
-              format: 'date-time',
-              example: '2025-02-03T12:00:00Z',
-            },
-            updatedAt: {
-              type: 'string',
-              format: 'date-time',
-              example: '2025-02-03T12:00:00Z',
-            },
           },
+        },
+      },
+    }),
+    ApiUnauthorizedResponse({
+      description: 'No autorizado - Token no proporcionado o inválido',
+    }),
+  );
+};
+
+export const ApiDeleteQuote = () => {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary: 'Eliminar una cotización',
+      description: 'Realiza un soft delete de una cotización existente',
+    }),
+    ApiParam({
+      name: 'id',
+      type: 'number',
+      description: 'ID de la cotización a eliminar',
+      required: true,
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Cotización eliminada exitosamente',
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Cotización no encontrada',
+      schema: {
+        example: {
+          statusCode: 404,
+          message: 'Cotización con ID 1 no encontrada',
+          error: 'Not Found',
         },
       },
     }),

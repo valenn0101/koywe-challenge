@@ -37,4 +37,5 @@ model Quote {
   user            User     @relation(fields: [userId], references: [id])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
 }
