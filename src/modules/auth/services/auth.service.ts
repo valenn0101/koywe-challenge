@@ -10,7 +10,11 @@ import {
   InvalidTokenException,
   UnauthorizedException,
 } from '../exceptions/auth-exceptions';
-import { UserAlreadyExistsException } from '../../users/exceptions/user-exceptions';
+import {
+  UserAlreadyExistsException,
+  UserNotFoundException,
+} from '../../users/exceptions/user-exceptions';
+import { UserEntity } from '../../users/entities/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -29,11 +33,18 @@ export class AuthService {
         throw new AuthenticationFailedException('Contraseña incorrecta');
       }
 
-      return this.generateTokens(user.id, user.email);
+      return this.generateTokens(user);
     } catch (error) {
+      if (error instanceof UserNotFoundException) {
+        throw new AuthenticationFailedException(
+          'El correo electrónico no está registrado',
+        );
+      }
+
       if (error instanceof AuthenticationFailedException) {
         throw error;
       }
+
       throw new AuthenticationFailedException('Credenciales inválidas');
     }
   }
@@ -41,25 +52,38 @@ export class AuthService {
   async register(createUserDto: CreateUserDto): Promise<Tokens> {
     try {
       const user = await this.usersService.create(createUserDto);
-      return this.generateTokens(user.id, user.email);
+      return this.generateTokens(user);
     } catch (error) {
       if (error instanceof UserAlreadyExistsException) {
         throw error;
       }
+
       throw new AuthenticationFailedException('Error al registrar el usuario');
     }
   }
 
-  async refreshTokens(userId: number, email: string): Promise<Tokens> {
+  async refreshTokens(refreshToken: string): Promise<Tokens> {
     try {
+      const payload = await this.verifyRefreshToken(refreshToken);
+      const userId = payload.sub;
+      const email = payload.email;
+
       const user = await this.usersService.findOne({ id: userId });
 
       if (user.email !== email) {
         throw new InvalidTokenException();
       }
 
-      return this.generateTokens(user.id, user.email);
+      if (user.refreshToken !== refreshToken) {
+        throw new InvalidTokenException();
+      }
+
+      return this.generateTokens(user);
     } catch (error) {
+      if (error instanceof UserNotFoundException) {
+        throw new InvalidTokenException();
+      }
+
       if (error instanceof InvalidTokenException) {
         throw error;
       }
@@ -67,17 +91,27 @@ export class AuthService {
     }
   }
 
-  private async generateTokens(userId: number, email: string): Promise<Tokens> {
+  private async verifyRefreshToken(token: string): Promise<JwtPayload> {
+    try {
+      return await this.jwtService.verifyAsync(token, {
+        secret: this.configService.get<string>('JWT_SECRET_KEY'),
+      });
+    } catch (error) {
+      throw new InvalidTokenException();
+    }
+  }
+
+  private async generateTokens(user: UserEntity): Promise<Tokens> {
     const jwtPayload: JwtPayload = {
-      sub: userId,
-      email: email,
+      sub: user.id,
+      email: user.email,
     };
 
     try {
       const [accessToken, refreshToken] = await Promise.all([
         this.jwtService.signAsync(jwtPayload, {
           secret: this.configService.get<string>('JWT_SECRET_KEY'),
-          expiresIn: '20m',
+          expiresIn: '2m',
         }),
         this.jwtService.signAsync(jwtPayload, {
           secret: this.configService.get<string>('JWT_SECRET_KEY'),
@@ -85,9 +119,16 @@ export class AuthService {
         }),
       ]);
 
+      await this.usersService.updateRefreshToken(user.id, refreshToken);
+
       return {
         accessToken,
         refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
       };
     } catch (error) {
       throw new AuthenticationFailedException('Error al generar los tokens');

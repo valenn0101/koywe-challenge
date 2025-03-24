@@ -4,6 +4,7 @@ import { Tokens } from '../interfaces/tokens.interface';
 import { CreateUserDto } from '../../users/dto/create-user.dto';
 import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
 import { LoginDto } from '../dto/login.dto';
+import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { LoginSwagger, RegisterSwagger, RefreshSwagger } from '../swagger';
 
 @ApiTags('Autenticación')
@@ -36,9 +37,8 @@ export class AuthController {
   @ApiResponse(RefreshSwagger.responses[HttpStatus.OK])
   @ApiResponse(RefreshSwagger.responses[HttpStatus.UNAUTHORIZED])
   async refreshTokens(
-    @Body('userId') userId: number,
-    @Body('email') email: string,
+    @Body() refreshTokenDto: RefreshTokenDto,
   ): Promise<Tokens> {
-    return this.authService.refreshTokens(userId, email);
+    return this.authService.refreshTokens(refreshTokenDto.refreshToken);
   }
 }
