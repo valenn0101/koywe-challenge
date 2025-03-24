@@ -39,4 +39,16 @@ export class UsersRepository {
     const users = await this.prisma.user.findMany();
     return users.map((user) => new UserEntity(user));
   }
+
+  async updateRefreshToken(
+    userId: number,
+    refreshToken: string,
+  ): Promise<UserEntity> {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { refreshToken },
+    });
+
+    return new UserEntity(user);
+  }
 }

@@ -3,9 +3,27 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const configService = app.get(ConfigService);
+  const isProd = configService.get('NODE_ENV') === 'production';
+
+  const corsOrigins =
+    configService.get('CORS_ORIGINS') ||
+    'http://localhost:3000,http://localhost:4200,http://localhost:8080';
+
+  app.enableCors({
+    origin: isProd
+      ? corsOrigins.split(',').map((origin) => origin.trim())
+      : '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    exposedHeaders: ['Authorization'],
+    maxAge: 3600,
+  });
 
   const config = new DocumentBuilder()
     .setTitle('API Example')

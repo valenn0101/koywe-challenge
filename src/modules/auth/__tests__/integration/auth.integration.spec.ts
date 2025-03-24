@@ -1,76 +1,35 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import * as request from 'supertest';
 import { AppModule } from '../../../../app.module';
 import { PrismaService } from '../../../../database/prisma.service';
-import { HttpExceptionFilter } from '../../../../common/filters/http-exception.filter';
 import { CreateUserDto } from '../../../users/dto/create-user.dto';
-import { ConfigService } from '@nestjs/config';
+import { LoginDto } from '../../../auth/dto/login.dto';
+import { RefreshTokenDto } from '../../../auth/dto/refresh-token.dto';
+import { UserEntity } from '../../../users/entities/user.entity';
 import * as bcrypt from 'bcrypt';
-
-jest.mock('bcrypt', () => ({
-  compare: jest.fn().mockResolvedValue(true),
-  genSalt: jest.fn().mockResolvedValue('salt'),
-  hash: jest.fn().mockResolvedValue('hashed_password'),
-}));
 
 describe('Auth Integration Tests', () => {
   let app: INestApplication;
   let prismaService: PrismaService;
 
-  const mockPrismaService = {
-    user: {
-      create: jest.fn(),
-      findUnique: jest.fn(),
-      findMany: jest.fn(),
-      deleteMany: jest.fn(),
-    },
-    $connect: jest.fn(),
-    $disconnect: jest.fn(),
-  };
-
-  const mockConfigService = {
-    get: jest.fn((key: string) => {
-      const config = {
-        JWT_SECRET_KEY: 'test-secret-key',
-      };
-      return config[key];
-    }),
-  };
-
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    })
-      .overrideProvider(PrismaService)
-      .useValue(mockPrismaService)
-      .overrideProvider(ConfigService)
-      .useValue(mockConfigService)
-      .compile();
+    }).compile();
 
     app = moduleFixture.createNestApplication();
-
-    app.useGlobalPipes(
-      new ValidationPipe({
-        transform: true,
-        whitelist: true,
-        forbidNonWhitelisted: true,
-      }),
-    );
-    app.useGlobalFilters(new HttpExceptionFilter());
-
-    prismaService = app.get<PrismaService>(PrismaService);
-
+    prismaService = moduleFixture.get<PrismaService>(PrismaService);
     await app.init();
   });
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockPrismaService.user.deleteMany.mockResolvedValue({ count: 0 });
+  afterAll(async () => {
+    await prismaService.user.deleteMany();
+    await app.close();
   });
 
-  afterAll(async () => {
-    await app.close();
+  beforeEach(async () => {
+    await prismaService.user.deleteMany();
   });
 
   describe('POST /auth/register', () => {
@@ -81,18 +40,6 @@ describe('Auth Integration Tests', () => {
     };
 
     it('should successfully register a new user and return tokens', async () => {
-      const mockCreatedUser = {
-        id: 1,
-        email: createUserDto.email,
-        name: createUserDto.name,
-        password: 'hashed_password',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockPrismaService.user.findUnique.mockResolvedValueOnce(null);
-      mockPrismaService.user.create.mockResolvedValueOnce(mockCreatedUser);
-
       const response = await request(app.getHttpServer())
         .post('/auth/register')
         .send(createUserDto)
@@ -100,32 +47,26 @@ describe('Auth Integration Tests', () => {
 
       expect(response.body).toHaveProperty('accessToken');
       expect(response.body).toHaveProperty('refreshToken');
-      expect(mockPrismaService.user.create).toHaveBeenCalledWith({
-        data: {
-          email: createUserDto.email,
-          name: createUserDto.name,
-          password: 'hashed_password',
-        },
+      expect(response.body).toHaveProperty('user');
+      expect(response.body.user).toHaveProperty('id');
+      expect(response.body.user).toHaveProperty('email', createUserDto.email);
+      expect(response.body.user).toHaveProperty('name', createUserDto.name);
+
+      const user = await prismaService.user.findUnique({
+        where: { email: createUserDto.email },
       });
-    });
-
-    it('should return 400 when validation fails', async () => {
-      const invalidUserDto = {
-        name: 'Test User',
-        email: 'invalid-email',
-        password: '123',
-      };
-
-      await request(app.getHttpServer())
-        .post('/auth/register')
-        .send(invalidUserDto)
-        .expect(400);
+      expect(user).toBeDefined();
+      expect(user?.name).toBe(createUserDto.name);
+      expect(user?.email).toBe(createUserDto.email);
+      expect(user?.refreshToken).toBeDefined();
     });
 
     it('should return 409 when user already exists', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValueOnce({
-        id: 1,
-        email: createUserDto.email,
+      await prismaService.user.create({
+        data: {
+          ...createUserDto,
+          password: await bcrypt.hash(createUserDto.password, 10),
+        },
       });
 
       await request(app.getHttpServer())
@@ -133,27 +74,40 @@ describe('Auth Integration Tests', () => {
         .send(createUserDto)
         .expect(409);
     });
+
+    it('should return 400 when password is invalid', async () => {
+      const invalidUserDto = {
+        ...createUserDto,
+        password: 'weak',
+      };
+
+      const response = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send(invalidUserDto)
+        .expect(400);
+
+      expect(response.body.message).toBe('Contraseña insegura');
+    });
   });
 
   describe('POST /auth/login', () => {
-    const loginData = {
+    const loginData: LoginDto = {
       email: 'test@example.com',
       password: 'Password123!',
     };
 
+    beforeEach(async () => {
+      const hashedPassword = await bcrypt.hash(loginData.password, 10);
+      await prismaService.user.create({
+        data: {
+          name: 'Test User',
+          email: loginData.email,
+          password: hashedPassword,
+        },
+      });
+    });
+
     it('should login user and return tokens', async () => {
-      const mockUser = {
-        id: 1,
-        email: loginData.email,
-        password: 'hashed_password',
-        name: 'Test User',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockPrismaService.user.findUnique.mockResolvedValueOnce(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(true);
-
       const response = await request(app.getHttpServer())
         .post('/auth/login')
         .send(loginData)
@@ -161,86 +115,84 @@ describe('Auth Integration Tests', () => {
 
       expect(response.body).toHaveProperty('accessToken');
       expect(response.body).toHaveProperty('refreshToken');
+      expect(response.body).toHaveProperty('user');
+      expect(response.body.user).toHaveProperty('id');
+      expect(response.body.user).toHaveProperty('email', loginData.email);
+      expect(response.body.user).toHaveProperty('name', 'Test User');
     });
 
-    it('should return 401 with invalid credentials', async () => {
-      const mockUser = {
-        id: 1,
-        email: loginData.email,
-        password: 'hashed_password',
-        name: 'Test User',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockPrismaService.user.findUnique.mockResolvedValueOnce(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValueOnce(false);
-
+    it('should return 401 when password is incorrect', async () => {
       await request(app.getHttpServer())
         .post('/auth/login')
-        .send(loginData)
+        .send({
+          ...loginData,
+          password: 'wrongpassword',
+        })
         .expect(401);
     });
 
-    it('should return 400 with invalid email format', async () => {
+    it('should return 401 when user does not exist', async () => {
       await request(app.getHttpServer())
         .post('/auth/login')
-        .send({ ...loginData, email: 'invalid-email' })
-        .expect(400);
+        .send({
+          ...loginData,
+          email: 'nonexistent@example.com',
+        })
+        .expect(401);
     });
   });
 
   describe('POST /auth/refresh', () => {
-    const refreshData = {
-      userId: 1,
-      email: 'test@example.com',
-    };
+    let refreshToken: string;
+
+    beforeEach(async () => {
+      const hashedPassword = await bcrypt.hash('Password123!', 10);
+      const user = await prismaService.user.create({
+        data: {
+          name: 'Test User',
+          email: 'test@example.com',
+          password: hashedPassword,
+        },
+      });
+
+      const loginResponse = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({
+          email: 'test@example.com',
+          password: 'Password123!',
+        });
+
+      refreshToken = loginResponse.body.refreshToken;
+    });
 
     it('should refresh tokens when data is valid', async () => {
-      const mockUser = {
-        id: refreshData.userId,
-        email: refreshData.email,
-        password: 'hashed_password',
-        name: 'Test User',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockPrismaService.user.findUnique.mockResolvedValueOnce(mockUser);
-
       const response = await request(app.getHttpServer())
         .post('/auth/refresh')
-        .send(refreshData)
+        .send({ refreshToken })
         .expect(200);
 
       expect(response.body).toHaveProperty('accessToken');
       expect(response.body).toHaveProperty('refreshToken');
+      expect(response.body).toHaveProperty('user');
+      expect(response.body.user).toHaveProperty('id');
+      expect(response.body.user).toHaveProperty('email', 'test@example.com');
+      expect(response.body.user).toHaveProperty('name', 'Test User');
     });
 
-    it('should return 401 when user does not exist', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValueOnce(null);
-
+    it('should return 401 when refresh token is invalid', async () => {
       await request(app.getHttpServer())
         .post('/auth/refresh')
-        .send(refreshData)
+        .send({ refreshToken: 'invalid_token' })
         .expect(401);
     });
 
-    it('should return 401 when email does not match', async () => {
-      const mockUser = {
-        id: refreshData.userId,
-        email: 'different@example.com',
-        password: 'hashed_password',
-        name: 'Test User',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      mockPrismaService.user.findUnique.mockResolvedValueOnce(mockUser);
+    it('should return 401 when refresh token is expired', async () => {
+      const expiredToken =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsImlhdCI6MTcwMDY0ODAwMCwiZXhwIjoxNzAwNjQ4MDAxfQ.4Adcj3UFYzPUVaVF43FmMze6JcZpsdaAJkYyrw1Z7uE';
 
       await request(app.getHttpServer())
         .post('/auth/refresh')
-        .send(refreshData)
+        .send({ refreshToken: expiredToken })
         .expect(401);
     });
   });

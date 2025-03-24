@@ -26,10 +26,12 @@ describe('AuthService', () => {
   const mockUsersService = {
     create: jest.fn(),
     findOne: jest.fn(),
+    updateRefreshToken: jest.fn(),
   };
 
   const mockJwtService = {
     signAsync: jest.fn(),
+    verifyAsync: jest.fn(),
   };
 
   const mockConfigService = {
@@ -83,6 +85,11 @@ describe('AuthService', () => {
       const mockTokens = {
         accessToken: 'access_token',
         refreshToken: 'refresh_token',
+        user: {
+          id: mockUser.id,
+          email: mockUser.email,
+          name: mockUser.name,
+        },
       };
 
       mockUsersService.findOne.mockResolvedValue(mockUser);
@@ -90,6 +97,7 @@ describe('AuthService', () => {
       mockJwtService.signAsync
         .mockResolvedValueOnce(mockTokens.accessToken)
         .mockResolvedValueOnce(mockTokens.refreshToken);
+      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
 
       const result = await service.login(loginData.email, loginData.password);
 
@@ -143,12 +151,18 @@ describe('AuthService', () => {
       const mockTokens = {
         accessToken: 'access_token',
         refreshToken: 'refresh_token',
+        user: {
+          id: mockUser.id,
+          email: mockUser.email,
+          name: mockUser.name,
+        },
       };
 
       mockUsersService.create.mockResolvedValue(mockUser);
       mockJwtService.signAsync
         .mockResolvedValueOnce(mockTokens.accessToken)
         .mockResolvedValueOnce(mockTokens.refreshToken);
+      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
 
       const result = await service.register(createUserDto);
 
@@ -177,102 +191,82 @@ describe('AuthService', () => {
   });
 
   describe('refreshTokens', () => {
-    const refreshData = {
-      userId: 1,
-      email: 'test@example.com',
-    };
-
+    const refreshToken = 'valid_refresh_token';
     const mockUser = new UserEntity({
-      id: refreshData.userId,
-      email: refreshData.email,
+      id: 1,
+      email: 'test@example.com',
       password: 'hashedPassword',
       name: 'Test User',
+      refreshToken: refreshToken,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+
+    const mockPayload = {
+      sub: mockUser.id,
+      email: mockUser.email,
+    };
 
     it('should refresh tokens when the data is valid', async () => {
       const mockTokens = {
         accessToken: 'new_access_token',
         refreshToken: 'new_refresh_token',
+        user: {
+          id: mockUser.id,
+          email: mockUser.email,
+          name: mockUser.name,
+        },
       };
 
+      mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
       mockUsersService.findOne.mockResolvedValue(mockUser);
       mockJwtService.signAsync
         .mockResolvedValueOnce(mockTokens.accessToken)
         .mockResolvedValueOnce(mockTokens.refreshToken);
+      mockUsersService.updateRefreshToken.mockResolvedValue(undefined);
 
-      const result = await service.refreshTokens(
-        refreshData.userId,
-        refreshData.email,
-      );
+      const result = await service.refreshTokens(refreshToken);
 
       expect(result).toEqual(mockTokens);
+      expect(mockJwtService.verifyAsync).toHaveBeenCalledWith(refreshToken, {
+        secret: 'test-secret-key',
+      });
       expect(usersService.findOne).toHaveBeenCalledWith({
-        id: refreshData.userId,
+        id: mockUser.id,
       });
     });
 
     it('should throw InvalidTokenException when the email does not match', async () => {
-      mockUsersService.findOne.mockResolvedValue(mockUser);
-
-      await expect(
-        service.refreshTokens(refreshData.userId, 'wrong@example.com'),
-      ).rejects.toThrow(InvalidTokenException);
-
-      expect(usersService.findOne).toHaveBeenCalledWith({
-        id: refreshData.userId,
+      mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        email: 'different@example.com',
       });
+
+      await expect(service.refreshTokens(refreshToken)).rejects.toThrow(
+        InvalidTokenException,
+      );
+    });
+
+    it('should throw InvalidTokenException when the refresh token does not match', async () => {
+      mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
+      mockUsersService.findOne.mockResolvedValue({
+        ...mockUser,
+        refreshToken: 'different_token',
+      });
+
+      await expect(service.refreshTokens(refreshToken)).rejects.toThrow(
+        InvalidTokenException,
+      );
     });
 
     it('should throw UnauthorizedException when the user does not exist', async () => {
+      mockJwtService.verifyAsync.mockResolvedValue(mockPayload);
       mockUsersService.findOne.mockRejectedValue(new Error());
 
-      await expect(
-        service.refreshTokens(refreshData.userId, refreshData.email),
-      ).rejects.toThrow(UnauthorizedException);
-
-      expect(usersService.findOne).toHaveBeenCalledWith({
-        id: refreshData.userId,
-      });
-    });
-  });
-
-  describe('generateTokens', () => {
-    const tokenData = {
-      userId: 1,
-      email: 'test@example.com',
-    };
-
-    it('should generate access token and refresh token', async () => {
-      const mockTokens = {
-        accessToken: 'access_token',
-        refreshToken: 'refresh_token',
-      };
-
-      mockJwtService.signAsync
-        .mockResolvedValueOnce(mockTokens.accessToken)
-        .mockResolvedValueOnce(mockTokens.refreshToken);
-
-      const result = await service['generateTokens'](
-        tokenData.userId,
-        tokenData.email,
+      await expect(service.refreshTokens(refreshToken)).rejects.toThrow(
+        UnauthorizedException,
       );
-
-      expect(result).toEqual(mockTokens);
-      expect(jwtService.signAsync).toHaveBeenCalledTimes(2);
-      expect(configService.get).toHaveBeenCalledWith('JWT_SECRET_KEY');
-    });
-
-    it('should throw AuthenticationFailedException when token generation fails', async () => {
-      mockJwtService.signAsync.mockRejectedValue(new Error());
-
-      await expect(
-        service['generateTokens'](tokenData.userId, tokenData.email),
-      ).rejects.toThrow(AuthenticationFailedException);
-
-      expect(jwtService.signAsync).toHaveBeenCalledTimes(2);
-      expect(configService.get).toHaveBeenCalledWith('JWT_SECRET_KEY');
     });
   });
 });

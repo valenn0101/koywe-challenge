@@ -18,6 +18,27 @@ export const LoginSwagger = {
             type: 'string',
             description: 'Token JWT para renovar el accessToken',
           },
+          user: {
+            type: 'object',
+            description: 'Datos del usuario autenticado',
+            properties: {
+              id: {
+                type: 'number',
+                description: 'ID único del usuario',
+                example: 1,
+              },
+              email: {
+                type: 'string',
+                description: 'Correo electrónico del usuario',
+                example: 'usuario@ejemplo.com',
+              },
+              name: {
+                type: 'string',
+                description: 'Nombre del usuario',
+                example: 'Juan Pérez',
+              },
+            },
+          },
         },
       },
     },

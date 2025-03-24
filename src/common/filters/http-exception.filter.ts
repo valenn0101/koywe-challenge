@@ -19,6 +19,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Error interno del servidor';
+    let details = null;
     let errors = {};
 
     if (
@@ -39,16 +40,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
       if (typeof exceptionResponse === 'object') {
         message = exceptionResponse['message'] || exception.message;
+        details = exceptionResponse['details'] || null;
       } else {
         message = exceptionResponse || exception.message;
       }
     }
 
     this.logger.error(`Error: ${request.method} ${request.url} - ${status}`);
+    this.logger.error(`Detalles: ${details}`);
 
     response.status(status).json({
       status,
       message,
+      details,
       errors: Object.keys(errors).length > 0 ? errors : undefined,
       timestamp: new Date().toISOString(),
     });
