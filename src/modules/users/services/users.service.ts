@@ -103,4 +103,15 @@ export class UsersService {
   async findAll(): Promise<UserEntity[]> {
     return this.usersRepository.findAll();
   }
+
+  async updateRefreshToken(
+    userId: number,
+    refreshToken: string,
+  ): Promise<UserEntity> {
+    const user = await this.usersRepository.updateRefreshToken(
+      userId,
+      refreshToken,
+    );
+    return user;
+  }
 }
