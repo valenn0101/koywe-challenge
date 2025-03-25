@@ -26,8 +26,8 @@ async function bootstrap() {
   });
 
   const config = new DocumentBuilder()
-    .setTitle('API Example')
-    .setDescription('The API description')
+    .setTitle('Koywe Exchange API')
+    .setDescription('The API for the Koywe Exchange')
     .setVersion('1.0')
     .addTag('api')
     .build();
