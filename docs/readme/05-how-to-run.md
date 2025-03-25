@@ -1,12 +1,5 @@
 # How to Run the Project
 
-## Prerequisites
-
-- Node.js (v20.18.1 or later)
-- npm
-- Docker (optional, but recommended)
-- Docker Compose (optional, but recommended)
-
 ## Local Development Setup
 
 ### 1. Clone the Repository
@@ -39,6 +32,19 @@ Edit the `.env` file with your specific configuration:
 - `POSTGRES_PASSWORD`: Database password
 - `POSTGRES_DB`: Database name
 - `APP_DB_PORT`: Database port
+- `JWT_SECRET_KEY`: Secret key for JWT tokens
+
+### 4. Database Migrations
+
+**Important:** You must run Prisma migrations to set up your database schema:
+
+```bash
+# Generate Prisma client
+npx prisma generate
+
+# Run migrations
+npx prisma migrate dev
+```
 
 ## Running the Application
 
@@ -51,11 +57,9 @@ npm run start:dev
 
 ### Option 2: Docker Compose (Recommended)
 
-#### Prerequisites
-- Docker
-- Docker Compose
-
 #### Running with Docker
+
+Docker setup will automatically run migrations during container startup.
 
 ```bash
 # Build and start the services
@@ -94,8 +98,8 @@ docker-compose down --volumes --remove-orphans
 
 ## Accessing the Application
 
-- Local: `http://localhost:${APP_PORT}`
-- Docker: `http://localhost:${APP_PORT}`
+- API: `http://localhost:${APP_PORT}`
+- Swagger Documentation: `http://localhost:${APP_PORT}/api/docs`
 
 ## Stopping the Application
 
@@ -108,9 +112,3 @@ make down
 # or
 docker-compose down
 ```
-
-## Troubleshooting
-
-- Ensure all environment variables are correctly set
-- Check Docker and Docker Compose are installed and running
-- Verify no other services are using the specified ports
